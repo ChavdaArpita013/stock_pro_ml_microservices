@@ -5,7 +5,7 @@ import ta.trend
 import ta.volatility
 import ta.volume
 
-def apply_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
+def apply_buy_indicators(df: pd.DataFrame) -> pd.DataFrame:
     
     # Adds multiple technical indicators to the stock dataframe for ML features.
     # Requires columns: Open, High, Low, Close, Volume

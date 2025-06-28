@@ -1,29 +1,30 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from utils.indicators import apply_all_indicators
+from indicators.buy_indicators import apply_buy_indicators
 import yfinance as yf
 import pandas as pd
 import numpy as np
 import joblib
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
+from model.sell_model import train_and_predict_sell
 
 app = FastAPI()
 
-class StockRequest(BaseModel):
+class BuyRequest(BaseModel):
     symbol :str
     start : str
     end : str
 
 
 @app.post("/buy-prediction")
-def predict_stock(data: StockRequest):
+def predict_stock(data: BuyRequest):
 
     df = yf.download(data.symbol , start=data.start , end=data.end)
 
     if(df.empty):
         return {"error: No Stock data avaible"}
-    df = apply_all_indicators(df)
+    df = apply_buy_indicators(df)
 
     features = df[[
         'Close', 'Volume', 'rsi', 'macd', 'macd_signal',
@@ -67,3 +68,24 @@ def predict_stock(data: StockRequest):
         "prediction": int(prediction)
     }
 
+class SellReqest(BaseModel):
+    symbol: str
+    buyPrice: float
+    buyDate: str
+    currPrice: float
+    currDate: str
+    interval: str
+    timeFrameDays: int
+
+@app.post("/sell-prediction")
+def predict_sell(req: SellReqest):
+    result = train_and_predict_sell(
+        symbol=req.symbol,
+        buy_price=req.buyPrice,
+        buy_date=req.buyDate,
+        curr_price=req.currPrice,
+        curr_date=req.currDate,
+        interval=req.interval,
+        time_frame_days=req.timeFrameDays
+    )
+    return {"action" : result}
