@@ -6,9 +6,7 @@ from ta.volatility import BollingerBands
 
 def apply_sell_indicators(df : pd.DataFrame)-> pd.DataFrame:
     df = df.copy()
-    print("vdknfdj",df.columns)
 
-    # Confirm required columns
     if "Close" not in df.columns:
         raise ValueError("'Close' column missing in data.")
     if "Volume" not in df.columns:
@@ -19,9 +17,7 @@ def apply_sell_indicators(df : pd.DataFrame)-> pd.DataFrame:
         raise ValueError("'Close' must be a 1D Series")
 
     #RSI
-   
     rsi = RSIIndicator(close=df["Close"], window=14)
-
 
     #MACD
     macd = MACD(close=df["Close"])

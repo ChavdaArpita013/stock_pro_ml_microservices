@@ -29,7 +29,45 @@ def train_and_predict_sell(symbol: str, buy_price:float , buy_date: str , curr_p
     #predict for latest data
     latest_data = features.iloc[-1:]
     prediction = model.predict(latest_data)[0]
+    probabilities = model.predict_proba(latest_data)[0]
+    confidence = round(probabilities[prediction] , 2)
 
-    return "SELL" if prediction == 1 else "HOLD"
+    #Generate reason for decision made by model
+    reasons = [] 
+    last_row = df.iloc[-1]
+
+    # MACD bearish crossover
+    if last_row.get("macd") is not None and last_row.get("macd_signal") is not None:
+        if last_row["macd"] < last_row["macd_signal"]:
+            reasons.append("MACD bearish crossover")
+
+    # RSI overbought
+    if last_row.get("rsi") is not None and last_row["rsi"] > 70:
+        reasons.append("RSI indicates overbought")
+
+    # Bollinger Band upper breakout
+    if last_row.get("bollinger_band_upper") is not None and last_row.get("Close") is not None:
+        if last_row["Close"] > last_row["bollinger_band_upper"]:
+            reasons.append("Price crossed upper Bollinger Band")
+
+    # Price below EMA (20)
+    if last_row.get("ema_20") is not None and last_row.get("Close") is not None:
+        if last_row["Close"] < last_row["ema_20"]:
+            reasons.append("Price fell below EMA-20")
+
+    # High volume drop
+    if last_row.get("volume_rolling_mean") is not None and last_row.get("Volume") is not None:
+        if last_row["Volume"] > 1.5 * last_row["volume_rolling_mean"]:
+            reasons.append("Unusually high volume with price drop")
+
+    # Pick top 2 only
+    if not reasons:
+        reasons.append("Based on historical pattern")
+
+    return {
+        "decision": "SELL" if prediction == 1 else "HOLD",
+        "confidence": confidence,
+        "reason": reasons[:2]  # limit to top 2
+    }
 
     
