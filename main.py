@@ -8,6 +8,9 @@ import joblib
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from model.sell_model import train_and_predict_sell
+from utils.data_loader import fetch_stock_data
+from model.forecast_model import predict_price
+from indicators.forecast_indicator import apply_forecast_indicator
 
 app = FastAPI()
 
@@ -89,3 +92,21 @@ def predict_sell(req: SellReqest):
         time_frame_days=req.timeFrameDays
     )
     return {"action" : result}
+
+class ForecastRequest(BaseModel):
+    symbol: str
+    start: str
+    interval : str
+    forecastDays : int
+
+def get_stock_forecast(req : ForecastRequest):
+    df = fetch_stock_data(req.symbol , req.start , req.interval)
+    forecast, trend, confidence = predict_price(df, req.forecastDays)
+    indicators = apply_forecast_indicator(df)
+
+    return{
+        "forecast" : forecast,
+        "trend": trend,
+        "confidence": confidence,
+        "technical_indicators": indicators
+    }
