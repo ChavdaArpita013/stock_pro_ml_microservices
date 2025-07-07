@@ -15,7 +15,7 @@ def apply_buy_indicators(df: pd.DataFrame) -> pd.DataFrame:
     
     #MACD
     macd = ta.trend.MACD(close=df['Close'])
-    df['mscd'] = macd.macd()
+    df['macd'] = macd.macd()
     df['macd_signal'] = macd.macd_signal()
 
     #SMA(50 , 200)
@@ -45,7 +45,7 @@ def apply_buy_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df['support'] = df['Close'].rolling(window=20).min()
     df['resistance'] = df['Close'].rolling(window=20).max()
 
-    df = df.dropna()
+    df.dropna(inplace=True)
 
     return df
 

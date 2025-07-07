@@ -1,16 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI , HTTPException
 from pydantic import BaseModel
-from indicators.buy_indicators import apply_buy_indicators
-import yfinance as yf
-import pandas as pd
-import numpy as np
-import joblib
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from model.sell_model import train_and_predict_sell
-from utils.data_loader import fetch_stock_data
+from core.data_loader import fetch_stock_data
 from model.forecast_model import predict_price
 from indicators.forecast_indicator import apply_forecast_indicator
+from buy.predict import predict_buy
+from sell.predict import predict_sell
+from sell.train import train_sell
+from sell.explain import explain_sell_prediction
 
 app = FastAPI()
 
@@ -18,58 +14,38 @@ class BuyRequest(BaseModel):
     symbol :str
     start : str
     end : str
+    interval: str
 
 
 @app.post("/buy-prediction")
-def predict_stock(data: BuyRequest):
+def predict_stock(req: BuyRequest):
 
-    df = yf.download(data.symbol , start=data.start , end=data.end)
+    try:
+        df = fetch_stock_data(
+            symbol=req.symbol,
+            start_date="2024-01-01",
+            end_date=req.currDate,
+            interval=req.interval
+        )
 
-    if(df.empty):
-        return {"error: No Stock data avaible"}
-    df = apply_buy_indicators(df)
+        if df.empty or len < 60:
+            raise HTTPException(status_code=500 , detail="No enough data to predict")
 
-    features = df[[
-        'Close', 'Volume', 'rsi', 'macd', 'macd_signal',
-        'sma_50', 'sma_200', 'ema_20', 'ema_50',
-        'bb_upper', 'bb_lower', 'bb_mavg', 'obv',
-        'volume_change_pct', 'price_change_pct',
-        'support', 'resistance'
-    ]].values
+        if "Close" not in df.columns:
+            raise ValueError("Missing required column Close in request")
+        
+        final_decision , model_votes = predict_buy(df)
+        
+        return{
+            "symbol" : req.symbol,
+            "final_decision": "BUY" if final_decision == 1 else "HOLD",
+            "model_votes" : model_votes,
+            "confidence_percentage" : f"{model_votes.count(1)/len(model_votes) * 100 : .2f}%",
+            "status": "success" 
+        }
 
-    window_size = 5
-    if len(features) < window_size:
-        return {"No Enough data avaible to make prediction"}
-    
-    X = []
-    y =[]
-
-    for i in range(len(features) - window_size - 1):
-        window = features[i:i+window_size]
-        curr_close = features[i + window_size - 1][0]
-        next_close = features[i + window_size ][0]
-        label = 1 if next_close > curr_close else 0
-        X.append(window)
-        y.append(label)
-
-    X = np.array(X).reshape(len(X), -1)
-    y = np.array(y)
-
-    model = RandomForestClassifier(n_estimators=100 , random_state=42)
-    model.fit(X,y)
-    
-    latest_window = features[-window_size:]
-    input_data = latest_window.reshape(1, -1)
-
-    prediction = model.predict(input_data)[0]
-    advice = "BUY" if prediction == 1 else "WAIT"
-
-    return{
-        "symbol" : data.symbol,
-        "date": str(df.index[-1].date()),
-        "advice":advice,
-        "prediction": int(prediction)
-    }
+    except Exception as e:
+        raise HTTPException(status_code=500 , detail=str(e))
 
 class SellReqest(BaseModel):
     symbol: str
@@ -82,16 +58,34 @@ class SellReqest(BaseModel):
 
 @app.post("/sell-prediction")
 def predict_sell(req: SellReqest):
-    result = train_and_predict_sell(
-        symbol=req.symbol,
-        buy_price=req.buyPrice,
-        buy_date=req.buyDate,
-        curr_price=req.currPrice,
-        curr_date=req.currDate,
-        interval=req.interval,
-        time_frame_days=req.timeFrameDays
-    )
-    return {"action" : result}
+    try:
+        df = fetch_stock_data(
+            symbol=req.symbol,
+            start_date="2024-01-01",
+            end_date=req.currDate,
+            interval=req.interval
+        )
+
+        if df.empty or len < 60:
+            raise HTTPException(status_code=500 , detail="No enough data to predict")
+        
+        train_sell(df , req.timeFrameDays)
+        prediction = predict_sell(df)
+
+        latest = df.iloc[-1]
+        reasons = explain_sell_prediction(latest)
+
+        return{
+            "symbol": req.symbol,
+            "final_decision" : prediction["final_decision"],
+            "confidence": prediction["confidence"],
+            "model_votes" : prediction["model_votes"],
+            "reasons": reasons,
+            "status": "success"
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500 , detail=str(e))
 
 class ForecastRequest(BaseModel):
     symbol: str

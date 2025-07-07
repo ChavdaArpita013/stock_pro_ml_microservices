@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-from indicators.sell_indicator import apply_sell_indicators
-from utils.data_loader import fetch_stock_data
+from sell.sell_indicator import apply_sell_indicators
+from core.data_loader import fetch_stock_data
 
 def train_and_predict_sell(symbol: str, buy_price:float , buy_date: str , curr_price : float , curr_date:str , interval:str , time_frame_days: int):
     #Load historic data

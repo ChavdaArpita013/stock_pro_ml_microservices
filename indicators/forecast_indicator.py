@@ -27,7 +27,7 @@ def apply_forecast_indicator(df : pd.DataFrame)-> dict:
     indicators['RSI'] = round(rsi.iloc[-1] , 2)
     if df['RSI'].iloc[-1] > 70:
         indicators["rsi_status"] = "Overbought"
-    if df['RSI'].iloc[-1] < 30:
+    elif df['RSI'].iloc[-1] < 30:
         indicators["rsi_status"] = "Oversold"
     else:
         indicators["rsi_status"] = "Neuteral"
